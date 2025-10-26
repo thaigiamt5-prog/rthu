@@ -37,7 +37,7 @@ jobs:
               Lower   = [char[]](97..122)     # a-z
               Number  = [char[]](48..57)      # 0-9
           }
-          $password = "G@m!ng0983"
+          $password = "tgt@123456"
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
           New-LocalUser -Name "Mincobat" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "Mincobat"
