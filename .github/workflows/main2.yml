@@ -9,14 +9,22 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Configure RDP Settings
+      - name: Configure Core RDP Settings
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
-                           -Name 'fDenyTSConnections' -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          Restart-Service -Name TermService
+                             -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
+                             -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
+                             -Name "SecurityLayer" -Value 0 -Force
 
-      - name: Create RDP User
+          netsh advfirewall firewall delete rule name="RDP-Tailscale"
+          netsh advfirewall firewall add rule name="RDP-Tailscale" `
+            dir=in action=allow protocol=TCP localport=3389
+
+          Restart-Service -Name TermService -Force
+
+      - name: Create RDP User with Secure Password
         run: |
           $password = "WinRDP@2025"
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
@@ -28,10 +36,13 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "xuantrieu"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "xuantrieu"
 
+          echo "RDP_CREDS=User: xuantrieu | Password: $password" >> $env:GITHUB_ENV
+
       - name: Install Steam
         run: |
           $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
           $installerPath = "$env:TEMP\SteamSetup.exe"
+
           Invoke-WebRequest -Uri $steamUrl -OutFile $installerPath
           Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
           Remove-Item $installerPath -Force
@@ -40,73 +51,60 @@ jobs:
         run: |
           $revoltUrl = "https://dl.revolt.vn/RevoltG.Installer.exe"
           $installerPath = "$env:TEMP\RevoltG.Installer.exe"
+
           Invoke-WebRequest -Uri $revoltUrl -OutFile $installerPath
+
           $process = Start-Process -FilePath $installerPath -PassThru
           Start-Sleep -Seconds 60
+
           if (!$process.HasExited) {
+              Write-Host "Installer vẫn đang chạy, sẽ dừng để tránh treo workflow"
               Stop-Process -Id $process.Id -Force
           }
+
           Remove-Item $installerPath -Force
 
-      - name: Install UniKey
-        run: |
-          $unikeyUrl = "https://www.unikey.org/download/UniKey4.6RC2-setup_x64.exe"
-          $unikeyPath = "$env:TEMP\UniKeySetup.exe"
-          Invoke-WebRequest -Uri $unikeyUrl -OutFile $unikeyPath
-          Start-Process -FilePath $unikeyPath -ArgumentList "/SILENT" -Wait
-          Remove-Item $unikeyPath -Force
-
-      - name: Install Office 365
-        timeout-minutes: 15
-        run: |
-          $odtUrl = "https://download.microsoft.com/download/2/9/4/294E3A3E-3F3D-4F0C-8E3F-9E4C3B3D3F3D/OfficeDeploymentTool.exe"
-          $odtPath = "$env:TEMP\ODT.exe"
-          $officeDir = "$env:TEMP\OfficeSetup"
-          Invoke-WebRequest -Uri $odtUrl -OutFile $odtPath
-          Start-Process -FilePath $odtPath -ArgumentList "/quiet", "/extract:$officeDir" -Wait
-          $configXml = @"
-<Configuration>
-  <Add OfficeClientEdition="64" Channel="Current">
-    <Product ID="O365ProPlusRetail">
-      <Language ID="en-us" />
-    </Product>
-  </Add>
-  <Display Level="None" AcceptEULA="TRUE" />
-</Configuration>
-"@
-          $configPath = "$officeDir\config.xml"
-          $configXml | Out-File -Encoding UTF8 -FilePath $configPath
-          Start-Process -FilePath "$officeDir\setup.exe" -ArgumentList "/configure", $configPath -Wait
-
-      - name: Add apps to Startup
+      - name: Add Steam and RevoltG to Startup
         run: |
           $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+
+          $steamExe = "C:\Program Files (x86)\Steam\Steam.exe"
+          $revoltExe = "C:\Program Files\RevoltG\RevoltG.exe"
+
           $shell = New-Object -ComObject WScript.Shell
-          $apps = @(
-            "C:\Program Files (x86)\Steam\Steam.exe",
-            "C:\Program Files\RevoltG\RevoltG.exe",
-            "C:\Program Files\UniKey\UniKeyNT.exe"
-          )
-          foreach ($app in $apps) {
-            if (Test-Path $app) {
-              $name = [System.IO.Path]::GetFileNameWithoutExtension($app)
-              $shortcut = $shell.CreateShortcut("$startupPath\$name.lnk")
-              $shortcut.TargetPath = $app
+
+          if (Test-Path $steamExe) {
+              $steamShortcut = "$startupPath\Steam.lnk"
+              $shortcut = $shell.CreateShortcut($steamShortcut)
+              $shortcut.TargetPath = $steamExe
               $shortcut.Save()
-            }
+          }
+
+          if (Test-Path $revoltExe) {
+              $revoltShortcut = "$startupPath\RevoltG.lnk"
+              $shortcut = $shell.CreateShortcut($revoltShortcut)
+              $shortcut.TargetPath = $revoltExe
+              $shortcut.Save()
           }
 
       - name: Install Tailscale
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.88.3-amd64.msi"
           $installerPath = "$env:TEMP\tailscale.msi"
+
           Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
           Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
           Remove-Item $installerPath -Force
 
-      - name: Connect Tailscale
+          if (-not (Test-Path "$env:ProgramFiles\Tailscale\tailscale.exe")) {
+              Write-Error "Tailscale installation failed"
+              exit 1
+          }
+
+      - name: Establish Tailscale Connection
         run: |
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
+
           $tsIP = $null
           $retries = 0
           while (-not $tsIP -and $retries -lt 10) {
@@ -114,21 +112,28 @@ jobs:
               Start-Sleep -Seconds 5
               $retries++
           }
+
           if (-not $tsIP) {
               Write-Error "Tailscale IP not assigned. Exiting."
               exit 1
           }
+
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
-      - name: Verify RDP
+      - name: Verify RDP Accessibility
         run: |
+          if (-not $env:TAILSCALE_IP) {
+              Write-Error "Tailscale IP not found in environment"
+              exit 1
+          }
+
           $testResult = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389
           if (-not $testResult.TcpTestSucceeded) {
               Write-Error "TCP connection to RDP port 3389 failed"
               exit 1
           }
+          Write-Host "TCP connectivity successful!"
 
-      
       - name: Maintain Connection
         run: |
           Write-Host "`n=== RDP ACCESS ==="
@@ -136,6 +141,7 @@ jobs:
           Write-Host "Username: xuantrieu"
           Write-Host "Password: WinRDP@2025"
           Write-Host "==================`n"
+
           while ($true) {
               Write-Host "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
               Start-Sleep -Seconds 300
