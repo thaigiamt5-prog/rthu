@@ -38,6 +38,47 @@ jobs:
 
           echo "RDP_CREDS=User: xuantrieu | Password: $password" >> $env:GITHUB_ENV
 
+      - name: Install Steam
+        run: |
+          $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
+          $installerPath = "$env:TEMP\SteamSetup.exe"
+
+          Invoke-WebRequest -Uri $steamUrl -OutFile $installerPath
+          Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+          Remove-Item $installerPath -Force
+
+      - name: Install RevoltG
+        run: |
+          $revoltUrl = "https://dl.revolt.vn/RevoltG.Installer.exe"
+          $installerPath = "$env:TEMP\RevoltG.Installer.exe"
+
+          Invoke-WebRequest -Uri $revoltUrl -OutFile $installerPath
+          Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+          Remove-Item $installerPath -Force
+
+      - name: Add Steam and RevoltG to Startup
+        run: |
+          $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+
+          $steamExe = "C:\Program Files (x86)\Steam\Steam.exe"
+          $revoltExe = "C:\Program Files\RevoltG\RevoltG.exe"
+
+          $shell = New-Object -ComObject WScript.Shell
+
+          if (Test-Path $steamExe) {
+              $steamShortcut = "$startupPath\Steam.lnk"
+              $shortcut = $shell.CreateShortcut($steamShortcut)
+              $shortcut.TargetPath = $steamExe
+              $shortcut.Save()
+          }
+
+          if (Test-Path $revoltExe) {
+              $revoltShortcut = "$startupPath\RevoltG.lnk"
+              $shortcut = $shell.CreateShortcut($revoltShortcut)
+              $shortcut.TargetPath = $revoltExe
+              $shortcut.Save()
+          }
+
       - name: Install Tailscale
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.88.3-amd64.msi"
