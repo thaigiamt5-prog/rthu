@@ -36,8 +36,6 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "xuantrieu"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "xuantrieu"
 
-          echo "RDP_CREDS=User: xuantrieu | Password: $password" >> $env:GITHUB_ENV
-
       - name: Install Steam
         run: |
           $steamUrl = "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
@@ -64,27 +62,58 @@ jobs:
 
           Remove-Item $installerPath -Force
 
-      - name: Add Steam and RevoltG to Startup
+      - name: Install UniKey
+        run: |
+          $unikeyUrl = "https://www.unikey.org/download/UniKey4.6RC2-setup_x64.exe"
+          $unikeyPath = "$env:TEMP\UniKeySetup.exe"
+
+          Invoke-WebRequest -Uri $unikeyUrl -OutFile $unikeyPath
+          Start-Process -FilePath $unikeyPath -ArgumentList "/SILENT" -Wait
+          Remove-Item $unikeyPath -Force
+
+      - name: Install Office 365
+        timeout-minutes: 10
+        run: |
+          $odtUrl = "https://download.microsoft.com/download/2/9/4/294E3A3E-3F3D-4F0C-8E3F-9E4C3B3D3F3D/OfficeDeploymentTool.exe"
+          $odtPath = "$env:TEMP\ODT.exe"
+          $officeDir = "$env:TEMP\OfficeSetup"
+
+          Invoke-WebRequest -Uri $odtUrl -OutFile $odtPath
+          Start-Process -FilePath $odtPath -ArgumentList "/quiet", "/extract:$officeDir" -Wait
+
+          $configXml = @"
+<Configuration>
+  <Add OfficeClientEdition="64" Channel="Current">
+    <Product ID="O365ProPlusRetail">
+      <Language ID="en-us" />
+    </Product>
+  </Add>
+  <Display Level="None" AcceptEULA="TRUE" />
+</Configuration>
+"@
+          $configPath = "$officeDir\config.xml"
+          $configXml | Out-File -Encoding UTF8 -FilePath $configPath
+
+          Start-Process -FilePath "$officeDir\setup.exe" -ArgumentList "/configure", $configPath -Wait
+
+      - name: Add apps to Startup
         run: |
           $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
-
-          $steamExe = "C:\Program Files (x86)\Steam\Steam.exe"
-          $revoltExe = "C:\Program Files\RevoltG\RevoltG.exe"
-
           $shell = New-Object -ComObject WScript.Shell
 
-          if (Test-Path $steamExe) {
-              $steamShortcut = "$startupPath\Steam.lnk"
-              $shortcut = $shell.CreateShortcut($steamShortcut)
-              $shortcut.TargetPath = $steamExe
-              $shortcut.Save()
-          }
+          $apps = @(
+            "C:\Program Files (x86)\Steam\Steam.exe",
+            "C:\Program Files\RevoltG\RevoltG.exe",
+            "C:\Program Files\UniKey\UniKeyNT.exe"
+          )
 
-          if (Test-Path $revoltExe) {
-              $revoltShortcut = "$startupPath\RevoltG.lnk"
-              $shortcut = $shell.CreateShortcut($revoltShortcut)
-              $shortcut.TargetPath = $revoltExe
+          foreach ($app in $apps) {
+            if (Test-Path $app) {
+              $name = [System.IO.Path]::GetFileNameWithoutExtension($app)
+              $shortcut = $shell.CreateShortcut("$startupPath\$name.lnk")
+              $shortcut.TargetPath = $app
               $shortcut.Save()
+            }
           }
 
       - name: Install Tailscale
@@ -96,12 +125,7 @@ jobs:
           Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
           Remove-Item $installerPath -Force
 
-          if (-not (Test-Path "$env:ProgramFiles\Tailscale\tailscale.exe")) {
-              Write-Error "Tailscale installation failed"
-              exit 1
-          }
-
-      - name: Establish Tailscale Connection
+      - name: Connect Tailscale
         run: |
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
 
@@ -120,19 +144,13 @@ jobs:
 
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
-      - name: Verify RDP Accessibility
+      - name: Verify RDP
         run: |
-          if (-not $env:TAILSCALE_IP) {
-              Write-Error "Tailscale IP not found in environment"
-              exit 1
-          }
-
           $testResult = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389
           if (-not $testResult.TcpTestSucceeded) {
               Write-Error "TCP connection to RDP port 3389 failed"
               exit 1
           }
-          Write-Host "TCP connectivity successful!"
 
       - name: Maintain Connection
         run: |
