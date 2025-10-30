@@ -47,29 +47,14 @@ jobs:
           Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
           Remove-Item $installerPath -Force
 
-      - name: Install RevoltG (with timeout fallback)
-        run: |
-          $revoltUrl = "https://dl.revolt.vn/RevoltG.Installer.exe"
-          $installerPath = "$env:TEMP\RevoltG.Installer.exe"
-
-          Invoke-WebRequest -Uri $revoltUrl -OutFile $installerPath
-
-          $process = Start-Process -FilePath $installerPath -PassThru
-          Start-Sleep -Seconds 60
-
-          if (!$process.HasExited) {
-              Write-Host "Installer vẫn đang chạy, sẽ dừng để tránh treo workflow"
-              Stop-Process -Id $process.Id -Force
-          }
-
-          Remove-Item $installerPath -Force
+      
 
       - name: Add Steam and RevoltG to Startup
         run: |
           $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
 
           $steamExe = "C:\Program Files (x86)\Steam\Steam.exe"
-          $revoltExe = "C:\Program Files\RevoltG\RevoltG.exe"
+       
 
           $shell = New-Object -ComObject WScript.Shell
 
