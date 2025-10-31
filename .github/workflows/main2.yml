@@ -47,6 +47,20 @@ jobs:
           Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
           Remove-Item $installerPath -Force
 
+- name: Add Code::Blocks to Startup
+  run: |
+    $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+    $cbExe = "C:\Program Files\CodeBlocks\codeblocks.exe"
+    $shell = New-Object -ComObject WScript.Shell
+
+    if (Test-Path $cbExe) {
+        $cbShortcut = "$startupPath\CodeBlocks.lnk"
+        $shortcut = $shell.CreateShortcut($cbShortcut)
+        $shortcut.TargetPath = $cbExe
+        $shortcut.Save()
+    } else {
+        Write-Warning "Code::Blocks executable not found at expected path."
+    }
       
 
       - name: Add Steam and RevoltG to Startup
