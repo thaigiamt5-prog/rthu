@@ -65,12 +65,7 @@ jobs:
               $shortcut.Save()
           }
 
-          if (Test-Path $revoltExe) {
-              $revoltShortcut = "$startupPath\RevoltG.lnk"
-              $shortcut = $shell.CreateShortcut($revoltShortcut)
-              $shortcut.TargetPath = $revoltExe
-              $shortcut.Save()
-          }
+         
 
       - name: Install Tailscale
         run: |
