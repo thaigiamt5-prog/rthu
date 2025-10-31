@@ -62,7 +62,7 @@ jobs:
 
       - name: Install Code::Blocks
         run: |
-          $cbUrl = "https://sourceforge.net/projects/codeblocks/files/latest/download"
+          $cbUrl = "https://downloads.sourceforge.net/project/codeblocks/Binaries/20.03/Windows/codeblocks-20.03-setup.exe"
           $installerPath = "$env:TEMP\codeblocks_setup.exe"
 
           Invoke-WebRequest -Uri $cbUrl -OutFile $installerPath
