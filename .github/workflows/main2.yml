@@ -60,32 +60,7 @@ jobs:
               $shortcut.Save()
           }
 
-      - name: Install Code::Blocks
-        run: |
-          $cbUrl = "https://downloads.sourceforge.net/project/codeblocks/Binaries/20.03/Windows/codeblocks-20.03-setup.exe?ts=gAAAAABpBLGTCV0AEGGfXaqyEEFtZoQkbJMi-e050ljdoj90_Ws8T-DzwKSj7zD49zUVWkzdEafiBzJOSGHhkuXT7__nyl97oA%3D%3D&use_mirror=onboardcloud&r="
-          $installerPath = "$env:TEMP\codeblocks_setup.exe"
-
-          Invoke-WebRequest -Uri $cbUrl -OutFile $installerPath
-          Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
-          Remove-Item $installerPath -Force
-
-          if (-not (Test-Path "C:\Program Files\CodeBlocks\codeblocks.exe")) {
-              Write-Error "Code::Blocks installation failed"
-              exit 1
-          }
-
-      - name: Add Code::Blocks to Startup
-        run: |
-          $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
-          $cbExe = "C:\Program Files\CodeBlocks\codeblocks.exe"
-          $shell = New-Object -ComObject WScript.Shell
-
-          if (Test-Path $cbExe) {
-              $cbShortcut = "$startupPath\CodeBlocks.lnk"
-              $shortcut = $shell.CreateShortcut($cbShortcut)
-              $shortcut.TargetPath = $cbExe
-              $shortcut.Save()
-          }
+     
 
       - name: Install Tailscale
         run: |
