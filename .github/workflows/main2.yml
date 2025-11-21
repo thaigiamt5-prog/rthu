@@ -113,3 +113,11 @@ jobs:
           Write-Host "║ Username: xuantrieu           ║"
           Write-Host "║ Password: WinRDP@2025         ║"
           Write-Host "╚══════════════════════════════╝"
+
+      - name: Keep RDP Session Alive
+        run: |
+          Write-Host "RDP session is ready. Keeping job alive..."
+          while ($true) {
+            Start-Sleep -Seconds 300
+            Write-Host "Still alive at $(Get-Date)"
+          }
