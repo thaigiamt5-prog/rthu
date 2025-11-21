@@ -17,8 +17,8 @@ jobs:
                              -Name "UserAuthentication" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
                              -Name "SecurityLayer" -Value 0 -Force
-          netsh advfirewall firewall delete rule name="RDP-Tailscale"
-          netsh advfirewall firewall add rule name="RDP-Tailscale" `
+          netsh advfirewall firewall delete rule name="RDP-Direct"
+          netsh advfirewall firewall add rule name="RDP-Direct" `
             dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
@@ -64,79 +64,37 @@ jobs:
               $shortcut.Save()
           }
 
-      - name: Install Tailscale
+      - name: Customize Desktop Character
         run: |
-          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.88.3-amd64.msi"
-          $installerPath = "$env:TEMP\tailscale.msi"
-          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
-          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
-          Remove-Item $installerPath -Force
-          if (-not (Test-Path "$env:ProgramFiles\Tailscale\tailscale.exe")) {
-              Write-Error "Tailscale installation failed"
-              exit 1
-          }
+          # Tải wallpaper nhân vật (ví dụ cyberpunk)
+          $url = "https://wallpapercave.com/wp/wp9111234.jpg"
+          $path = "C:\Users\xuantrieu\Pictures\character.jpg"
+          Invoke-WebRequest -Uri $url -OutFile $path
 
-      - name: Establish Tailscale Connection
-        run: |
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
-          $tsIP = $null
-          $retries = 0
-          while (-not $tsIP -and $retries -lt 10) {
-              $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-              Start-Sleep -Seconds 5
-              $retries++
-          }
-          if (-not $tsIP) {
-              Write-Error "Tailscale IP not assigned. Exiting."
-              exit 1
-          }
-          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
+          # Đặt wallpaper
+          reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $path /f
+          RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
 
-      - name: Verify RDP Accessibility
-        run: |
-          if (-not $env:TAILSCALE_IP) {
-              Write-Error "Tailscale IP not found in environment"
-              exit 1
-          }
-          $testResult = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389
-          if (-not $testResult.TcpTestSucceeded) {
-              Write-Error "TCP connection to RDP port 3389 failed"
-              exit 1
-          }
-          Write-Host "TCP connectivity successful!"
+          # Thêm script chào mừng vào Startup
+          $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+          $scriptPath = "$startupPath\welcome.ps1"
+          @"
+          Write-Host '===============================' -ForegroundColor Cyan
+          Write-Host '   👤 Welcome, Commander!       ' -ForegroundColor Yellow
+          Write-Host '   Your character is ready!     ' -ForegroundColor Green
+          Write-Host '===============================' -ForegroundColor Cyan
+          [console]::beep(800,400)
+          "@ | Out-File -FilePath $scriptPath -Encoding UTF8
 
-      - name: Maintain Connection
+      - name: Show Public IP
         run: |
+          $publicIP = (Invoke-RestMethod -Uri "https://api.ipify.org?format=text")
           Write-Host "`n=== RDP ACCESS ==="
           Write-Host "╔══════════════════════════════╗"
-          Write-Host "║ Address : $env:TAILSCALE_IP   ║"
+          Write-Host "║ Address : $publicIP           ║"
           Write-Host "║ Username: xuantrieu           ║"
           Write-Host "║ Password: WinRDP@2025         ║"
           Write-Host "╚══════════════════════════════╝"
-- name: Customize Desktop Character
-  run: |
-    # Tải wallpaper nhân vật (ví dụ cyberpunk)
-    $url = "https://wallpapercave.com/wp/wp9111234.jpg"
-    $path = "C:\Users\xuantrieu\Pictures\character.jpg"
-    Invoke-WebRequest -Uri $url -OutFile $path
-
-    # Đặt wallpaper
-    reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $path /f
-    RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
-
-    # Thêm script chào mừng vào Startup
-    $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
-    $scriptPath = "$startupPath\welcome.ps1"
-    @"
-    Write-Host '===============================' -ForegroundColor Cyan
-    Write-Host '   👤 Welcome, Commander!       ' -ForegroundColor Yellow
-    Write-Host '   Your character is ready!     ' -ForegroundColor Green
-    Write-Host '===============================' -ForegroundColor Cyan
-    [console]::beep(800,400)
-    "@ | Out-File -FilePath $scriptPath -Encoding UTF8
-
-
-
 
       - name: Keep RDP Session Alive
         run: |
