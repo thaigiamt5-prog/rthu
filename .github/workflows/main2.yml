@@ -113,6 +113,30 @@ jobs:
           Write-Host "║ Username: xuantrieu           ║"
           Write-Host "║ Password: WinRDP@2025         ║"
           Write-Host "╚══════════════════════════════╝"
+- name: Customize Desktop Character
+  run: |
+    # Tải wallpaper nhân vật (ví dụ cyberpunk)
+    $url = "https://wallpapercave.com/wp/wp9111234.jpg"
+    $path = "C:\Users\xuantrieu\Pictures\character.jpg"
+    Invoke-WebRequest -Uri $url -OutFile $path
+
+    # Đặt wallpaper
+    reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $path /f
+    RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
+
+    # Thêm script chào mừng vào Startup
+    $startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+    $scriptPath = "$startupPath\welcome.ps1"
+    @"
+    Write-Host '===============================' -ForegroundColor Cyan
+    Write-Host '   👤 Welcome, Commander!       ' -ForegroundColor Yellow
+    Write-Host '   Your character is ready!     ' -ForegroundColor Green
+    Write-Host '===============================' -ForegroundColor Cyan
+    [console]::beep(800,400)
+    "@ | Out-File -FilePath $scriptPath -Encoding UTF8
+
+
+
 
       - name: Keep RDP Session Alive
         run: |
