@@ -24,11 +24,6 @@ jobs:
 
     - name: Build my engine
       run: g++ -std=c++17 -O2 main.cpp -o mychessengine
-      # 👉 Nếu file nằm trong src/, đổi thành: g++ -std=c++17 -O2 src/main.cpp -o mychessengine
-      # 👉 Nếu nhiều file .cpp: g++ -std=c++17 -O2 *.cpp -o mychessengine
-
-    - name: Run unit tests
-      run: ./tests/run_tests.sh || echo "No tests found"
 
   match:
     name: Engine vs Stockfish
@@ -39,29 +34,40 @@ jobs:
     - name: Checkout source
       uses: actions/checkout@v3
 
-    - name: Install compiler
-      run: sudo apt-get update && sudo apt-get install -y g++
+    - name: Install compiler and tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y g++ stockfish wget unzip
 
     - name: Build my engine
       run: g++ -std=c++17 -O2 main.cpp -o mychessengine
 
-    - name: Download Stockfish
+    - name: Download cutechess-cli
       run: |
-        curl -L https://stockfishchess.org/files/stockfish-ubuntu-x86_64.tar.gz -o stockfish.tar.gz
-        tar -xzf stockfish.tar.gz
-        mv stockfish* stockfish
+        wget -O cutechess.zip https://github.com/cutechess/cutechess/releases/download/1.2.0/cutechess-1.2.0-linux.zip
+        unzip cutechess.zip -d cutechess
+        chmod +x cutechess/cutechess-cli
 
-    - name: Install CuteChess
-      run: sudo apt-get install -y cutechess-cli
-
-    - name: Run match
+    - name: Debug binaries
       run: |
-        cutechess-cli \
+        ls -R
+        which stockfish || true
+        stockfish -version || true
+        ./mychessengine || true
+        ./cutechess/cutechess-cli --version || true
+
+    - name: Run match (10 games, 5+0)
+      run: |
+        ./cutechess/cutechess-cli \
           -engine cmd=./mychessengine name=MyEngine \
-          -engine cmd=./stockfish/stockfish name=Stockfish \
+          -engine cmd=$(which stockfish) name=Stockfish \
           -each proto=uci tc=5+0 \
           -games 10 \
-          -pgnout match.pgn
+          -repeat \
+          -recover \
+          -draw movenumber=60 movecount=4 score=5 \
+          -pgnout match.pgn \
+          -current
 
     - name: Upload PGN results
       uses: actions/upload-artifact@v3
