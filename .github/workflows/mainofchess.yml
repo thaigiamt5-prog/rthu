@@ -24,7 +24,8 @@ jobs:
 
     - name: Build my engine
       run: g++ -std=c++17 -O2 main.cpp -o mychessengine
-      # 👉 Nếu file nằm trong src/, đổi thành: src/main.cpp
+      # 👉 Nếu file nằm trong src/, đổi thành: g++ -std=c++17 -O2 src/main.cpp -o mychessengine
+      # 👉 Nếu nhiều file .cpp: g++ -std=c++17 -O2 *.cpp -o mychessengine
 
     - name: Run unit tests
       run: ./tests/run_tests.sh || echo "No tests found"
