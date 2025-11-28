@@ -1,0 +1,85 @@
+name: Chess Engine CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Install compiler
+      run: sudo apt-get update && sudo apt-get install -y g++
+
+    - name: Build my engine
+      run: g++ -std=c++17 -O2 src/main.cpp -o mychessengine
+
+    - name: Run unit tests
+      run: ./tests/run_tests.sh
+
+  match:
+    name: Engine vs Stockfish
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Install compiler
+      run: sudo apt-get update && sudo apt-get install -y g++
+
+    - name: Build my engine
+      run: g++ -std=c++17 -O2 src/main.cpp -o mychessengine
+
+    - name: Download Stockfish
+      run: |
+        curl -L https://stockfishchess.org/files/stockfish-ubuntu-x86_64.tar.gz -o stockfish.tar.gz
+        tar -xzf stockfish.tar.gz
+        mv stockfish* stockfish
+
+    - name: Install CuteChess
+      run: sudo apt-get install -y cutechess-cli
+
+    - name: Run match
+      run: |
+        cutechess-cli \
+          -engine cmd=./mychessengine name=MyEngine \
+          -engine cmd=./stockfish/stockfish name=Stockfish \
+          -each proto=uci tc=5+0 \
+          -games 10 \
+          -pgnout match.pgn
+
+    - name: Upload PGN results
+      uses: actions/upload-artifact@v3
+      with:
+        name: match-results
+        path: match.pgn
+
+  release:
+    name: Release binaries
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Build Linux binary
+      run: g++ -std=c++17 -O2 src/main.cpp -o mychessengine-linux
+
+    - name: Upload Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: mychessengine-linux
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
