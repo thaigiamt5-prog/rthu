@@ -53,10 +53,13 @@ jobs:
               $shortcut.Save()
           }
 
-      - name: Maintain Connection
+           - name: Maintain Connection
         run: |
+          $ip = (Invoke-RestMethod -Uri "https://api.ipify.org?format=text")
+          $hostname = $env:COMPUTERNAME
           Write-Host "`n=== RDP ACCESS ==="
-          Write-Host "Address: <YOUR_SERVER_IP>"
+          Write-Host "Address: $ip"
+          Write-Host "Hostname: $hostname"
           Write-Host "Username: xuantrieu"
           Write-Host "Password: WinRDP@2025"
           Write-Host "==================`n"
