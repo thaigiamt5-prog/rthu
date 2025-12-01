@@ -53,17 +53,36 @@ jobs:
               $shortcut.Save()
           }
 
-           - name: Maintain Connection
+      - name: Maintain Connection
         run: |
           $ip = (Invoke-RestMethod -Uri "https://api.ipify.org?format=text")
           $hostname = $env:COMPUTERNAME
-          Write-Host "`n=== RDP ACCESS ==="
-          Write-Host "Address: $ip"
-          Write-Host "Hostname: $hostname"
-          Write-Host "Username: xuantrieu"
-          Write-Host "Password: WinRDP@2025"
-          Write-Host "==================`n"
+          $logFile = "$env:USERPROFILE\rdp-info.txt"
+
+          $info = @"
+=== RDP ACCESS ===
+Address: $ip
+Hostname: $hostname
+Username: xuantrieu
+Password: WinRDP@2025
+==================
+"@
+
+          # In ra màn hình
+          Write-Host $info
+
+          # Ghi ra file
+          $info | Out-File -FilePath $logFile -Encoding UTF8 -Force
+
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
+              $msg = "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
+              Write-Host $msg
+              $msg | Out-File -FilePath $logFile -Append -Encoding UTF8
               Start-Sleep -Seconds 300
           }
+
+      - name: Upload RDP Info Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: rdp-info
+          path: ${{ env.USERPROFILE }}\rdp-info.txt
