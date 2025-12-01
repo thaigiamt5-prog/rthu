@@ -53,15 +53,10 @@ jobs:
               $shortcut.Save()
           }
 
-      - name: Get Public IP
-        run: |
-          $publicIP = (Invoke-RestMethod -Uri "https://api.ipify.org?format=text")
-          echo "PUBLIC_IP=$publicIP" >> $env:GITHUB_ENV
-
       - name: Maintain Connection
         run: |
           Write-Host "`n=== RDP ACCESS ==="
-          Write-Host "Address: $env:PUBLIC_IP"
+          Write-Host "Address: <YOUR_SERVER_IP>"
           Write-Host "Username: xuantrieu"
           Write-Host "Password: WinRDP@2025"
           Write-Host "==================`n"
