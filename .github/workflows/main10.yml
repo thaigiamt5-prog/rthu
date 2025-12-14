@@ -5,7 +5,7 @@ on:
 
 jobs:
   secure-rdp:
-    runs-on: windows-2016
+    runs-on: mac0s-lastest
     timeout-minutes: 360
 
     steps:
